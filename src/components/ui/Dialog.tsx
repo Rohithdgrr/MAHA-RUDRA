@@ -11,6 +11,8 @@ interface DialogProps {
   size?: "sm" | "md" | "lg";
   /** Optional footer bar (actions). Rendered pinned at the bottom. */
   footer?: JSX.Element;
+  /** Hide the built-in title bar (caller renders a custom header). Esc/backdrop still close. */
+  hideHeader?: boolean;
 }
 
 /** Centered modal with backdrop blur, scale-in and close button. Web-safe. */
@@ -49,8 +51,9 @@ export function Dialog(props: DialogProps) {
           style={`background:var(--surface);border:1px solid var(--border);border-radius:18px;box-shadow:var(--shadow-lg);width:${sizeWidth() ?? props.width ?? "min(92vw,480px)"};max-height:min(88vh,720px);overflow:hidden;display:flex;flex-direction:column`}
           onClick={(e) => e.stopPropagation()}
         >
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 20px 14px;border-bottom:1px solid var(--border);flex-shrink:0">
-            <h2 style="margin:0;font-size:15px;font-weight:700;letter-spacing:-0.01em">{props.title}</h2>
+          <Show when={!props.hideHeader}>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 20px 14px;border-bottom:1px solid var(--border);flex-shrink:0">
+              <h2 style="margin:0;font-size:15px;font-weight:700;letter-spacing:-0.01em">{props.title}</h2>
             <button
               ref={closeBtnRef}
               type="button"
@@ -68,7 +71,8 @@ export function Dialog(props: DialogProps) {
             >
               <X size={16} />
             </button>
-          </div>
+            </div>
+          </Show>
           <div style="padding:20px;overflow-y:auto;flex:1" class="rudra-scroll">
             {props.children}
           </div>

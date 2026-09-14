@@ -166,8 +166,14 @@ describe("SSE streaming (Phase 2)", () => {
     } as unknown as ServerEvent);
     expect(status).toMatchObject({ type: "session.status" });
     expect(
-      toRudraEvent({ type: "todo.updated", properties: {} } as unknown as ServerEvent),
+      toRudraEvent({ type: "lsp.updated", properties: {} } as unknown as ServerEvent),
     ).toBeUndefined();
+    expect(
+      toRudraEvent({
+        type: "todo.updated",
+        properties: { sessionID: "s1", todos: [] },
+      } as unknown as ServerEvent),
+    ).toMatchObject({ type: "todo.updated", properties: { sessionID: "s1" } });
   });
 
   it("fans out GlobalEvent payloads to all subscribers over one connection", async () => {

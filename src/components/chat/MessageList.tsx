@@ -2,12 +2,22 @@ import { For, Show, createEffect } from "solid-js";
 import { Bot, Sparkles } from "lucide-solid";
 import { strings } from "../../lib/i18n/en";
 import type { MessageWithParts } from "../../lib/backend/types";
+import { extractText } from "../../lib/utils/markdown";
 import { MessageBubble } from "./MessageBubble";
 
 interface MessageListProps {
   messages: MessageWithParts[];
   loading: boolean;
   streaming?: boolean;
+  onRetry?: (text: string) => void;
+}
+
+function createdOf(m: MessageWithParts): number {
+  return (m.info as unknown as { time?: { created?: number } }).time?.created ?? 0;
+}
+
+function isUserMsg(m: MessageWithParts): boolean {
+  return (m.info as unknown as { role?: string }).role === "user";
 }
 
 /** Vertical message feed with sticky auto-scroll, rich empty state and streaming indicator. */
@@ -30,7 +40,8 @@ export function MessageList(props: MessageListProps) {
   });
 
   return (
-    <div ref={scrollRef} style="flex:1;overflow-y:auto;padding:18px 20px;background:radial-gradient(900px 500px at 50% 0%, rgba(255,77,28,0.04), transparent 60%), var(--bg)" class="rudra-scroll">
+    <div ref={scrollRef} style="flex:1;overflow-y:auto;background:var(--bg)" class="rudra-scroll">
+      <div class="chat-col">
       <Show when={props.loading}>
         <div style="display:flex;align-items:center;gap:10px;padding:16px;color:var(--muted);font-size:13px">
           <span style="width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--rudra-orange);border-radius:50%;display:inline-block;animation:rudra-spin 0.7s linear infinite" />
@@ -52,13 +63,45 @@ export function MessageList(props: MessageListProps) {
           </div>
         </div>
       </Show>
-      <For each={props.messages}>{(m) => <MessageBubble message={m} />}</For>
+      <For each={props.messages}>
+        {(m, i) => {
+          const prevUsers = () =>
+            props.messages.slice(0, i()).filter(isUserMsg);
+          const lastUser = () => {
+            const users = prevUsers();
+            return users[users.length - 1];
+          };
+          const retryText = () => {
+            const u = lastUser();
+            return !isUserMsg(m) && u
+              ? extractText(
+                  u.parts as { type: string; text?: string }[],
+                )
+              : "";
+          };
+          const latency = () => {
+            const u = lastUser();
+            return !isUserMsg(m) && u && createdOf(m) > 0 && createdOf(u) > 0
+              ? createdOf(m) - createdOf(u)
+              : undefined;
+          };
+          return (
+            <MessageBubble
+              message={m}
+              live={props.streaming && i() === props.messages.length - 1}
+              latencyMs={latency()}
+              retryText={retryText() || undefined}
+              onRetry={props.onRetry}
+            />
+          );
+        }}
+      </For>
       <Show when={props.streaming}>
-        <div style="display:flex;align-items:center;gap:10px;margin:14px 0 4px;padding-left:42px">
+        <div style="display:flex;align-items:center;gap:10px;margin:14px 0 4px">
           <span
-            style="width:32px;height:32px;border-radius:11px;background:var(--surface);border:1px solid var(--border);display:inline-flex;align-items:center;justify-content:center;color:var(--rudra-orange);box-shadow:var(--shadow-sm)"
+            style="width:26px;height:26px;border-radius:8px;background:#fde9e2;border:1px solid rgba(255,77,28,0.25);display:inline-flex;align-items:center;justify-content:center;color:#cf3a12"
           >
-            <Bot size={15} />
+            <Bot size={14} />
           </span>
           <span style="display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;background:var(--surface);border:1px solid var(--border);font-size:12px;color:var(--muted);font-weight:600;box-shadow:var(--shadow-sm)">
             <span style="width:8px;height:8px;border-radius:50%;background:var(--rudra-orange);display:inline-block;animation:rudra-pulse 1.2s infinite" />
@@ -66,6 +109,7 @@ export function MessageList(props: MessageListProps) {
           </span>
         </div>
       </Show>
+      </div>
     </div>
   );
 }

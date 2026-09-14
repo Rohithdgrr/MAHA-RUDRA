@@ -47,6 +47,16 @@ export class TauriBackendAdapter implements BackendAdapter {
   getMessages(sessionID: string): Promise<MessageWithParts[]> {
     return this.inner.getMessages(sessionID);
   }
+  getTodos(sessionID: string): Promise<import("@opencode-ai/sdk/client").Todo[]> {
+    return this.inner.getTodos(sessionID);
+  }
+  replyPermission(
+    sessionID: string,
+    permissionID: string,
+    response: "once" | "always" | "reject",
+  ): Promise<void> {
+    return this.inner.replyPermission(sessionID, permissionID, response);
+  }
   sendPrompt(input: SendPromptInput): Promise<void> {
     return this.inner.sendPrompt(input);
   }

@@ -54,6 +54,9 @@ export interface ServerHealth {
   version: string;
 }
 
+export type Todo = import("@opencode-ai/sdk/client").Todo;
+export type Permission = import("@opencode-ai/sdk/client").Permission;
+
 export type RudraEvent =
   | { type: "server.connected"; properties: { version?: string } }
   | { type: "session.created"; properties: { sessionID: string; session?: Session } }
@@ -65,18 +68,21 @@ export type RudraEvent =
   | { type: "message.updated"; properties: { sessionID: string; message: Message } }
   | { type: "message.removed"; properties: { sessionID: string; messageID: string } }
   | {
-      type: "message.part.updated";
-      properties: { sessionID: string; messageID: string; partID: string; part: Part; delta?: string };
-    }
+       type: "message.part.updated";
+       properties: { sessionID: string; messageID: string; partID: string; part: Part; delta?: string };
+     }
   | { type: "message.part.removed"; properties: { sessionID: string; messageID: string; partID: string } }
   | { type: "tool.execution.started"; properties: { sessionID: string; toolID: string } }
   | { type: "tool.execution.completed"; properties: { sessionID: string; toolID: string } }
+  | { type: "todo.updated"; properties: { sessionID: string; todos: Todo[] } }
+  | { type: "permission.updated"; properties: Permission }
+  | { type: "permission.replied"; properties: { sessionID: string; permissionID: string } }
   | { type: "error"; properties: { message: string } };
 
 /**
  * Normalize a raw `opencode serve` SSE payload (`GlobalEvent.payload`)
  * into the smaller `RudraEvent` shape the UI consumes. Returns undefined
- * for events the UI intentionally ignores (lsp, todos, pty, …).
+ * for events the UI intentionally ignores (lsp, pty, …).
  */
 export function toRudraEvent(raw: ServerEvent): RudraEvent | undefined {
   switch (raw.type) {
@@ -130,6 +136,24 @@ export function toRudraEvent(raw: ServerEvent): RudraEvent | undefined {
       };
     case "message.part.removed":
       return { type: "message.part.removed", properties: { ...raw.properties } };
+    case "todo.updated":
+      return {
+        type: "todo.updated",
+        properties: {
+          sessionID: (raw.properties as { sessionID: string }).sessionID,
+          todos: (raw.properties as { todos: import("@opencode-ai/sdk/client").Todo[] }).todos ?? [],
+        },
+      };
+    case "permission.updated":
+      return {
+        type: "permission.updated",
+        properties: raw.properties as Permission,
+      };
+    case "permission.replied":
+      return {
+        type: "permission.replied",
+        properties: raw.properties as { sessionID: string; permissionID: string },
+      };
     default:
       return undefined;
   }
@@ -161,6 +185,13 @@ export interface BackendAdapter {
   getSession(id: string): Promise<Session>;
   deleteSession(id: string): Promise<void>;
   getMessages(sessionID: string): Promise<MessageWithParts[]>;
+  getTodos(sessionID: string): Promise<import("@opencode-ai/sdk/client").Todo[]>;
+
+  replyPermission(
+    sessionID: string,
+    permissionID: string,
+    response: "once" | "always" | "reject",
+  ): Promise<void>;
 
   sendPrompt(input: SendPromptInput): Promise<void>;
   /** Abort the running turn in `sessionID` (`POST /session/{id}/abort`). */

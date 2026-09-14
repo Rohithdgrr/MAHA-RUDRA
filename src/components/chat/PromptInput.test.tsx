@@ -16,8 +16,8 @@ describe("PromptInput", () => {
       <PromptInput sending={false} onSend={() => undefined} />
     ));
     expect(getByLabelText("Prompt input")).toBeTruthy();
-    // Send button is present and disabled when input is empty
-    const sendBtn = getByRole("button", { name: "Type a message to send" }) as HTMLButtonElement;
+    // Orange Send pill is present and disabled when input is empty
+    const sendBtn = getByRole("button", { name: "Send" }) as HTMLButtonElement;
     expect(sendBtn).toBeTruthy();
     expect(sendBtn.disabled).toBe(true);
   });

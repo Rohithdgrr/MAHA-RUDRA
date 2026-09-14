@@ -188,6 +188,23 @@ export class HttpBackendAdapter implements BackendAdapter {
     return unwrap(result, "List messages");
   }
 
+  async getTodos(sessionID: string): Promise<import("@opencode-ai/sdk/client").Todo[]> {
+    const result = await this.requireClient().session.todo({ path: { id: sessionID } });
+    return unwrap(result, "List todos");
+  }
+
+  async replyPermission(
+    sessionID: string,
+    permissionID: string,
+    response: "once" | "always" | "reject",
+  ): Promise<void> {
+    const result = await this.requireClient().postSessionIdPermissionsPermissionId({
+      path: { id: sessionID, permissionID },
+      body: { response },
+    });
+    unwrap(result, "Reply permission");
+  }
+
   async sendPrompt(input: SendPromptInput): Promise<void> {
     const text = input.text.trim();
     if (!text) throw new RudraError("invalid_input", "Prompt text is required");

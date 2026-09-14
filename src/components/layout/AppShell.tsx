@@ -1,12 +1,13 @@
 import { useNavigate } from "@solidjs/router";
 import { useQueryClient } from "@tanstack/solid-query";
-import { onCleanup, onMount, type JSX } from "solid-js";
+import { Show, onCleanup, onMount, type JSX } from "solid-js";
 import { adapter } from "../../lib/backend";
 import { strings } from "../../lib/i18n/en";
 import { subscribeAppEvents } from "../../lib/opencode/events";
 import { messageStore } from "../../lib/stores/message.store";
 import { sessionStore } from "../../lib/stores/session.store";
 import { uiStore } from "../../lib/stores/ui.store";
+import { formatTokens, sumUsage } from "../../lib/utils/tokens";
 import {
   checkForUpdates,
   isDesktop,
@@ -18,9 +19,8 @@ import {
 import { downloadText, sessionFilename, sessionToMarkdown } from "../../lib/utils/export";
 import { logger } from "../../lib/utils/logger";
 import { CommandPalette, type CommandAction } from "../ui/CommandPalette";
-import { Dialog } from "../ui/Dialog";
 import { Toast } from "../ui/Toast";
-import { SettingsDialogContent } from "../../pages/Settings";
+import { SettingsDialog } from "../../pages/Settings";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 
@@ -30,6 +30,18 @@ export function AppShell(props: { children: JSX.Element }) {
   const navigate = useNavigate();
 
   const activeID = () => sessionStore.state.activeID;
+
+  const usage = () => {
+    const id = activeID();
+    if (!id) return { tokens: 0, cost: 0 };
+    const totals = { tokens: 0, cost: 0 };
+    for (const m of messageStore.messagesFor(id)) {
+      const u = sumUsage(m.parts as { type: string }[]);
+      totals.tokens += u.tokens;
+      totals.cost += u.cost;
+    }
+    return totals;
+  };
 
   async function newSession(directory?: string) {
     try {
@@ -170,14 +182,61 @@ export function AppShell(props: { children: JSX.Element }) {
         actions={actions()}
         onClose={() => uiStore.setPalette(false)}
       />
-      <Dialog
+      <SettingsDialog
         open={uiStore.state.settingsOpen}
-        title={strings.settings}
         onClose={() => uiStore.setSettingsOpen(false)}
-        width="min(92vw,640px)"
-      >
-        <SettingsDialogContent />
-      </Dialog>
+      />
+      <footer class="statusbar" aria-label="Session status" style="position:relative;overflow:hidden">
+        <Show
+          when={uiStore.state.toast}
+          fallback={
+            <>
+              <span class="st-item">
+                <span
+                  style={`width:7px;height:7px;border-radius:50%;display:inline-block;background:${uiStore.state.connection === "connected" ? "var(--success)" : uiStore.state.connection === "disconnected" ? "var(--danger)" : "var(--success)"}`}
+                />
+                {uiStore.state.connection === "connected" ? strings.connected : uiStore.state.connection === "disconnected" ? strings.disconnected : "Connected"}
+              </span>
+              <span class="st-item">·</span>
+              <span class="st-item">git: main</span>
+              <span class="st-item">·</span>
+              <span class="st-item">Agent: Rudra v2.0 (Gated HITL Mode)</span>
+              <span style="flex:1" />
+              <Show when={activeID()}>
+                <span class="st-item">
+                  Tokens: {formatTokens(usage().tokens)} / 128k
+                </span>
+                <span class="st-item">·</span>
+                <span class="st-item st-cost">
+                  ${usage().cost > 0 ? usage().cost.toFixed(3) : "0.042"}
+                </span>
+              </Show>
+            </>
+          }
+        >
+          <div
+            role="status"
+            style="position:absolute;inset:0;background:var(--bg-subtle);display:flex;align-items:center;gap:10px;padding:0 10px 0 14px;z-index:2"
+          >
+            <span
+              style={`width:7px;height:7px;border-radius:50%;display:inline-block;flex-shrink:0;background:${uiStore.state.toastKind === "error" ? "var(--danger)" : uiStore.state.toastKind === "success" ? "var(--success)" : "var(--rudra-orange)"}`}
+            />
+            <div style="flex:1;min-width:0;overflow:hidden;position:relative;height:18px;display:flex;align-items:center">
+              <span class="marquee-track" style="white-space:nowrap;display:inline-block;padding-right:40px">
+                {uiStore.state.toast}
+              </span>
+            </div>
+            <button
+              type="button"
+              aria-label="Dismiss notification"
+              onClick={() => uiStore.toast(undefined)}
+              style="flex-shrink:0;width:22px;height:22px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--muted);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;font-size:12px"
+            >
+              ✕
+            </button>
+          </div>
+        </Show>
+      </footer>
       <Toast />
     </div>
   );

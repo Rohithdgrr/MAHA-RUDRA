@@ -1,7 +1,9 @@
 import { adapter } from "../backend";
 import type { RudraEvent, Unsubscribe } from "../backend/types";
 import { messageStore } from "../stores/message.store";
+import { permissionStore } from "../stores/permission.store";
 import { sessionStore } from "../stores/session.store";
+import { todoStore } from "../stores/todo.store";
 import { uiStore } from "../stores/ui.store";
 import { maybeNotifyTurnComplete } from "../tauri/desktop";
 import { logger } from "../utils/logger";
@@ -74,6 +76,15 @@ export function handleRudraEvent(event: RudraEvent, queries?: QueryInvalidator):
     case "tool.execution.completed":
       // Legacy aliases: modern servers send message.part.updated for tools.
       void queries?.invalidateQueries({ queryKey: ["messages", event.properties.sessionID] });
+      break;
+    case "todo.updated":
+      todoStore.setTodos(event.properties.sessionID, event.properties.todos);
+      break;
+    case "permission.updated":
+      permissionStore.upsert(event.properties);
+      break;
+    case "permission.replied":
+      permissionStore.remove(event.properties.sessionID, event.properties.permissionID);
       break;
     case "server.connected":
     case "error":

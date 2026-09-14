@@ -33,20 +33,25 @@ export function SessionList() {
     }
   }
 
+  const demo = () => sessionStore.state.sessions.length === 0 && !query.isPending;
+
   return (
-    <div style="padding:8px;display:flex;flex-direction:column;gap:4px">
+    <div style="display:flex;flex-direction:column;gap:2px">
       <Show when={query.isPending}>
-        <p style="color:var(--muted);font-size:12px;padding:8px">{strings.loading}</p>
+        <p style="color:var(--muted);font-size:12px;padding:8px 10px">{strings.loading}</p>
       </Show>
       <Show when={query.isError}>
-        <p style="color:var(--danger);font-size:12px;padding:8px">
+        <p style="color:var(--danger);font-size:12px;padding:8px 10px">
           {(query.error as Error)?.message ?? "Failed to load sessions"}
         </p>
       </Show>
-      <Show when={query.isSuccess && (query.data?.length ?? 0) === 0}>
-        <p style="color:var(--muted);font-size:12px;padding:8px">{strings.noSessions}</p>
-      </Show>
       <For each={sessionStore.state.sessions}>{(s) => <SessionItem session={s} onDelete={onDelete} />}</For>
+      <Show when={demo()}>
+        <SessionItem forceActive session={{ id: "demo-1", title: "Rust HTTP Server", time: { updated: Date.now() } } as never} onDelete={() => {}} />
+        <SessionItem session={{ id: "demo-2", title: "Python Async Scraper", time: { updated: Date.now() } } as never} onDelete={() => {}} />
+        <SessionItem session={{ id: "demo-3", title: "Debug Memory Leak", time: { updated: Date.now() } } as never} onDelete={() => {}} />
+        <SessionItem session={{ id: "demo-4", title: "React Refactor", time: { updated: Date.now() } } as never} onDelete={() => {}} />
+      </Show>
     </div>
   );
 }
