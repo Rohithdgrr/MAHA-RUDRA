@@ -1,6 +1,7 @@
 import { createSignal, For, Show, onCleanup, onMount } from "solid-js";
 import { ArrowUp, ChevronDown, Paperclip, Square, Loader2 } from "lucide-solid";
 import { strings } from "../../lib/i18n/en";
+import { uiStore, type EffortLevel } from "../../lib/stores/ui.store";
 import { AgentPicker } from "./AgentPicker";
 import { ModelPicker } from "./ModelPicker";
 
@@ -163,15 +164,15 @@ export function PromptInput(props: PromptInputProps) {
 // Effort / priority dropdown (Low / Medium / High)
 // ---------------------------------------------------------------------------
 
-const effortLevels = ["Low", "Medium", "High"] as const;
+const effortLevels: EffortLevel[] = ["Low", "Medium", "High"];
 
 function EffortDropdown() {
   const [open, setOpen] = createSignal(false);
-  const [selected, setSelected] = createSignal("Low");
+  const selected = () => uiStore.state.prefs.effort;
   let containerRef: HTMLDivElement | undefined;
 
-  function pick(level: string) {
-    setSelected(level);
+  function pick(level: EffortLevel) {
+    uiStore.setPrefs({ effort: level });
     setOpen(false);
   }
 
