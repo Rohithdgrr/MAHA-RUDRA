@@ -1,0 +1,58 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "RUDRA AI",
+  "mainBinaryName": "rudra-ai",
+  "version": "0.1.0",
+  "identifier": "ai.rudra.desktop",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:5173",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "RUDRA AI — The storm that writes code.",
+        "width": 1280,
+        "height": 860,
+        "minWidth": 960,
+        "minHeight": 640
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self' ipc: http://ipc.localhost; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' ipc: http://ipc.localhost http://127.0.0.1:4096 http://localhost:4096; img-src 'self' asset: http://asset.localhost blob: data:"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "createUpdaterArtifacts": false,
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "category": "DeveloperTool",
+    "shortDescription": "RUDRA AI — The storm that writes code.",
+    "externalBin": ["binaries/opencode"]
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["rudra"]
+      }
+    },
+    "updater": {
+      "active": false,
+      "dialog": false,
+      "endpoints": [
+        "https://github.com/rudra-ai/rudra-ai/releases/latest/download/latest.json"
+      ],
+      "pubkey": ""
+    }
+  }
+}
