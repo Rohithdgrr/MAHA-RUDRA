@@ -1,7 +1,6 @@
-import { createSignal, Show } from "solid-js";
-import { Bot, Cpu, Send, Sparkles, Square, Loader2 } from "lucide-solid";
+import { createSignal, For, Show, onCleanup, onMount } from "solid-js";
+import { ArrowUp, ChevronDown, Paperclip, Square, Loader2 } from "lucide-solid";
 import { strings } from "../../lib/i18n/en";
-import { Button } from "../ui/Button";
 import { AgentPicker } from "./AgentPicker";
 import { ModelPicker } from "./ModelPicker";
 
@@ -12,7 +11,7 @@ interface PromptInputProps {
   onStop?: () => void;
 }
 
-/** Polished composer: labeled pills, auto-grow input, gradient send with micro-interactions. */
+/** Clean composer: textarea on top, bottom toolbar with +/agent/model/effort/send. */
 export function PromptInput(props: PromptInputProps) {
   const [text, setText] = createSignal("");
   const [focused, setFocused] = createSignal(false);
@@ -37,36 +36,12 @@ export function PromptInput(props: PromptInputProps) {
   }
 
   return (
-    <div style="padding:14px 16px 12px;background:linear-gradient(180deg, transparent 0%, var(--bg-subtle) 100%);border-top:1px solid var(--border)">
+    <div style="padding:10px 16px 6px">
       <div
         style={`background:var(--surface);border:1.5px solid ${focused() ? "var(--rudra-orange)" : "var(--border)"};border-radius:20px;box-shadow:${focused() ? "0 0 0 3px rgba(255,77,28,0.12), var(--shadow-md)" : "var(--shadow-sm)"};transition:all var(--transition-base);overflow:hidden;transform:${focused() ? "translateY(-1px)" : "none"}`}
       >
-        {/* Toolbar */}
-        <div style="display:flex;align-items:center;gap:12px;padding:11px 14px 9px;border-bottom:1px solid var(--border);background:linear-gradient(180deg, var(--surface) 0%, var(--bg-subtle) 100%);flex-wrap:wrap">
-          <span style="display:inline-flex;align-items:center;gap:7px;font-size:11px;font-weight:800;letter-spacing:0.07em;text-transform:uppercase;color:var(--muted)">
-            <span style="width:22px;height:22px;border-radius:7px;background:var(--rudra-gradient);display:inline-flex;align-items:center;justify-content:center;color:white;box-shadow:0 2px 8px rgba(255,77,28,0.25)">
-              <Sparkles size={11} />
-            </span>
-            Compose
-          </span>
-          <span style="flex:1;min-width:12px" />
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-            <span style="display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border-radius:999px;background:rgba(255,77,28,0.08);border:1px solid rgba(255,77,28,0.18);color:var(--rudra-orange);font-size:11px;font-weight:700">
-              <Cpu size={12} />
-              Model
-            </span>
-            <ModelPicker compact />
-            <span style="width:1px;height:20px;background:var(--border);display:inline-block;margin:0 2px" />
-            <span style="display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border-radius:999px;background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.18);color:#818cf8;font-size:11px;font-weight:700">
-              <Bot size={12} />
-              Agent
-            </span>
-            <AgentPicker compact />
-          </div>
-        </div>
-
-        {/* Textarea */}
-        <div style="padding:6px 14px 4px">
+        {/* Textarea — top area */}
+        <div style="padding:12px 16px 4px">
           <textarea
             ref={taRef}
             value={text()}
@@ -82,55 +57,178 @@ export function PromptInput(props: PromptInputProps) {
                 submit();
               }
             }}
-            placeholder={strings.promptPlaceholder}
+            placeholder="Ask anything, / for commands, @ for context..."
             rows={2}
             aria-label="Prompt input"
-            style="width:100%;min-height:56px;max-height:160px;resize:none;background:transparent;color:var(--fg);border:none;outline:none;padding:10px 2px 6px;font-size:15px;line-height:1.65;font-family:Inter, system-ui, sans-serif;placeholder-color:var(--muted);transition:height var(--transition-fast)"
+            style="width:100%;min-height:48px;max-height:160px;resize:none;background:transparent;color:var(--fg);border:none;outline:none;padding:4px 2px 6px;font-size:15px;line-height:1.6;font-family:Inter, system-ui, sans-serif;placeholder-color:var(--muted);transition:height var(--transition-fast)"
           />
         </div>
 
-        {/* Footer */}
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px 12px;background:var(--surface);border-top:1px solid transparent">
-          <div style="display:flex;align-items:center;gap:8px">
-            <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);font-weight:500">
-              <kbd style="display:inline-flex;align-items:center;justify-content:center;min-width:26px;padding:4px 7px;border-radius:7px;background:var(--bg);border:1px solid var(--border);border-bottom-width:2px;font-size:10px;font-weight:800;letter-spacing:0.03em;color:var(--muted);font-family:inherit;box-shadow:var(--shadow-sm)">
-                ↵
-              </kbd>
-              <span style="opacity:0.9">Ctrl + Enter to send</span>
-            </span>
-            <Show when={hasText()}>
-              <span style="font-size:11px;color:var(--muted);opacity:0.7">{text().trim().length} chars</span>
-            </Show>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <Show when={props.streaming && props.onStop}>
-              <Button variant="danger" size="md" onClick={props.onStop} style="gap:7px;min-width:84px">
-                <Square size={13} fill="currentColor" />
-                {strings.stop}
-              </Button>
-            </Show>
-            <Button
+        {/* Bottom toolbar */}
+        <div style="display:flex;align-items:center;gap:6px;padding:6px 8px 8px;border-top:1px solid transparent">
+          {/* + button (attachments) */}
+          <button
+            type="button"
+            title="Attach file"
+            style="width:32px;height:32px;border-radius:10px;border:none;background:transparent;color:var(--muted);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:all var(--transition-fast)"
+            onMouseEnter={(e) => {
+              const el = e.currentTarget as HTMLButtonElement;
+              el.style.background = "var(--surface-hover)";
+              el.style.color = "var(--fg)";
+            }}
+            onMouseLeave={(e) => {
+              const el = e.currentTarget as HTMLButtonElement;
+              el.style.background = "transparent";
+              el.style.color = "var(--muted)";
+            }}
+          >
+            <Paperclip size={16} />
+          </button>
+
+          {/* Agent picker — "Build" style */}
+          <AgentPicker compact />
+
+          {/* Separator */}
+          <span style="width:1px;height:20px;background:var(--border);display:inline-block;flex-shrink:0" />
+
+          {/* Model picker — chip style */}
+          <ModelPicker compact />
+
+          {/* Separator */}
+          <span style="width:1px;height:20px;background:var(--border);display:inline-block;flex-shrink:0" />
+
+          {/* Effort dropdown */}
+          <EffortDropdown />
+
+          {/* Spacer */}
+          <span style="flex:1;min-width:4px" />
+
+          {/* Send / Stop button */}
+          <Show when={props.streaming && props.onStop}>
+            <button
+              type="button"
+              onClick={props.onStop}
+              title={strings.stop}
+              style="width:34px;height:34px;border-radius:50%;border:1px solid rgba(248,81,73,0.3);background:rgba(248,81,73,0.12);color:var(--danger);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:all var(--transition-fast)"
+              onMouseEnter={(e) => {
+                const el = e.currentTarget as HTMLButtonElement;
+                el.style.background = "rgba(248,81,73,0.2)";
+              }}
+              onMouseLeave={(e) => {
+                const el = e.currentTarget as HTMLButtonElement;
+                el.style.background = "rgba(248,81,73,0.12)";
+              }}
+            >
+              <Square size={14} fill="currentColor" />
+            </button>
+          </Show>
+          <Show when={!props.streaming}>
+            <button
               type="submit"
-              variant="primary"
-              size="md"
-              disabled={!canSend()}
               onClick={(e) => {
                 e.preventDefault();
                 submit();
               }}
-              style={`min-width:104px;gap:7px;position:relative;overflow:hidden;${canSend() ? "box-shadow:var(--shadow-glow)" : ""}`}
+              disabled={!canSend()}
+              title={canSend() ? strings.send : "Type a message to send"}
+              style={`width:34px;height:34px;border-radius:50%;border:none;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:all var(--transition-fast);${canSend() ? "background:var(--surface-hover);color:var(--fg);box-shadow:var(--shadow-sm)" : "background:transparent;color:var(--muted);cursor:not-allowed;opacity:0.5"}`}
+              onMouseEnter={(e) => {
+                if (!canSend()) return;
+                const el = e.currentTarget as HTMLButtonElement;
+                el.style.background = "var(--surface-active)";
+                el.style.transform = "scale(1.05)";
+              }}
+              onMouseLeave={(e) => {
+                if (!canSend()) return;
+                const el = e.currentTarget as HTMLButtonElement;
+                el.style.background = "var(--surface-hover)";
+                el.style.transform = "none";
+              }}
             >
-              <Show when={props.sending} fallback={<Send size={15} style="transition:transform var(--transition-fast)" />}>
-                <Loader2 size={15} style="animation:rudra-spin 0.8s linear infinite" />
+              <Show when={props.sending} fallback={<ArrowUp size={16} strokeWidth={2.5} />}>
+                <Loader2 size={16} style="animation:rudra-spin 0.8s linear infinite" />
               </Show>
-              {props.sending ? strings.loading : strings.send}
-            </Button>
-          </div>
+            </button>
+          </Show>
         </div>
       </div>
-      <p style="margin:9px 2px 0;font-size:11px;color:var(--muted);text-align:center;opacity:0.75;letter-spacing:0.01em">
+      <p style="margin:7px 2px 0;font-size:10px;color:var(--muted);text-align:center;opacity:0.6;letter-spacing:0.01em">
         RUDRA can make mistakes — review important code before shipping.
       </p>
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Effort / priority dropdown (Low / Medium / High)
+// ---------------------------------------------------------------------------
+
+const effortLevels = ["Low", "Medium", "High"] as const;
+
+function EffortDropdown() {
+  const [open, setOpen] = createSignal(false);
+  const [selected, setSelected] = createSignal("Low");
+  let containerRef: HTMLDivElement | undefined;
+
+  function pick(level: string) {
+    setSelected(level);
+    setOpen(false);
+  }
+
+  function handleClickOutside(e: MouseEvent) {
+    if (containerRef && !containerRef.contains(e.target as Node)) {
+      setOpen(false);
+    }
+  }
+
+  onMount(() => document.addEventListener("mousedown", handleClickOutside));
+  onCleanup(() => document.removeEventListener("mousedown", handleClickOutside));
+
+  return (
+    <div ref={containerRef} style="position:relative;display:inline-flex;align-items:center">
+      <button
+        type="button"
+        onClick={() => setOpen(!open())}
+        style="display:inline-flex;align-items:center;gap:4px;padding:5px 9px;border-radius:999px;border:1px solid var(--border);background:var(--surface);color:var(--fg);font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;transition:all var(--transition-fast);white-space:nowrap"
+        onMouseEnter={(e) => {
+          const el = e.currentTarget as HTMLButtonElement;
+          el.style.borderColor = "var(--border-hover)";
+          el.style.background = "var(--surface-hover)";
+        }}
+        onMouseLeave={(e) => {
+          const el = e.currentTarget as HTMLButtonElement;
+          el.style.borderColor = "var(--border)";
+          el.style.background = "var(--surface)";
+        }}
+      >
+        {selected()}
+        <ChevronDown size={12} style={`transition:transform var(--transition-fast);${open() ? "transform:rotate(180deg)" : ""}`} />
+      </button>
+      <Show when={open()}>
+        <div
+          style="position:absolute;top:calc(100% + 6px);left:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);box-shadow:var(--shadow-lg);padding:4px;min-width:100px;z-index:100;animation:rudra-scaleIn 0.15s ease-out"
+        >
+          <For each={effortLevels}>
+            {(level) => (
+              <button
+                type="button"
+                onClick={() => pick(level)}
+                style={`width:100%;display:block;text-align:left;padding:7px 10px;border:none;border-radius:6px;background:${selected() === level ? "rgba(255,77,28,0.1)" : "transparent"};color:${selected() === level ? "var(--rudra-orange)" : "var(--fg)"};font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;transition:background var(--transition-fast)`}
+                onMouseEnter={(e) => {
+                  if (selected() !== level) (e.currentTarget as HTMLButtonElement).style.background = "var(--surface-hover)";
+                }}
+                onMouseLeave={(e) => {
+                  if (selected() !== level) (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+                }}
+              >
+                {level}
+              </button>
+            )}
+          </For>
+        </div>
+      </Show>
+    </div>
+  );
+}
+
+

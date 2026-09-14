@@ -17,7 +17,7 @@ export const strings = {
   newSession: "New Session",
   newSessionTitle: "Untitled session",
   sessions: "Sessions",
-  promptPlaceholder: "Ask RUDRA anything… (Ctrl+Enter to send)",
+  promptPlaceholder: "Ask anything, / for commands, @ for context...",
   send: "Send",
   stop: "Stop",
   stopStream: "Stop current stream",
