@@ -8,6 +8,7 @@ import { MessageBubble } from "./MessageBubble";
 interface MessageListProps {
   messages: MessageWithParts[];
   loading: boolean;
+  sessionId?: string;
   streaming?: boolean;
   onRetry?: (text: string) => void;
 }
@@ -88,6 +89,7 @@ export function MessageList(props: MessageListProps) {
           return (
             <MessageBubble
               message={m}
+              sessionId={props.sessionId}
               live={props.streaming && i() === props.messages.length - 1}
               latencyMs={latency()}
               retryText={retryText() || undefined}

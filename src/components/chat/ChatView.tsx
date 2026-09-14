@@ -3,6 +3,10 @@ import { Show, onCleanup, onMount } from "solid-js";
 import { Bot, Copy, RotateCcw } from "lucide-solid";
 import { adapter } from "../../lib/backend";
 import { getAgentSelection, resolveStoredAgent } from "../../lib/opencode/agents";
+import { handleExplicitMemory } from "../../lib/memory/explicit";
+import { buildMemoryBlock, mergeSystemPrompt } from "../../lib/memory/inject";
+import { traceInjection } from "../../lib/memory/injectionTrace";
+import { memoryStore } from "../../lib/memory/memory.store";
 import { getModelSelection } from "../../lib/opencode/models";
 import { notePromptSent } from "../../lib/tauri/desktop";
 import { messageStore } from "../../lib/stores/message.store";
@@ -112,15 +116,53 @@ export function ChatView(props: { sessionID: string }) {
 
   async function onSend(text: string) {    messageStore.setSending(true);
     messageStore.setError(undefined);
+    // Phase 2: explicit `remember …` / `/memory` commands save locally first.
+    // Slash commands and blocked secrets never reach the server.
+    try {
+      const explicit = await handleExplicitMemory(text, { sessionID: props.sessionID });
+      if (explicit.intercept) {
+        messageStore.setSending(false);
+        return;
+      }
+    } catch (err) {
+      logger.warn(`Explicit memory failed: ${(err as Error).message}`);
+    }
     notePromptSent(props.sessionID);
     try {
+      // Phase 5: merge the memory block with the persona system prompt.
+      // Personas win on behavior; memory only adds user facts. Budget-capped.
+      const persona = resolveStoredAgent(getAgentSelection());
+      let system = persona.system;
+      try {
+        if (uiStore.state.prefs.memoryEnabled) {
+          await memoryStore.load().catch(() => undefined);
+          const prefs = uiStore.state.prefs;
+          const { block, used, dropped } = buildMemoryBlock(memoryStore.active(), {
+            budgetTokens: prefs.memoryBudgetTokens,
+            includeSensitive: prefs.includeSensitiveMemory,
+          });
+          traceInjection(props.sessionID, block ? used : []);
+          if (block) {
+            system = mergeSystemPrompt(persona.system, block);
+            if (dropped.length > 0) {
+              logger.debug(`Memory injection dropped ${dropped.length} facts (budget/sensitive/stale)`);
+            }
+          }
+        } else {
+          traceInjection(props.sessionID, []);
+        }
+      } catch (err) {
+        logger.warn(`Memory injection failed: ${(err as Error).message}`);
+      }
       // The picked model/agent (if any) ride along so the server generates
       // with them instead of the possibly-broken defaults.
       await adapter.sendPrompt({
         sessionID: props.sessionID,
         text,
         model: getModelSelection(),
-        ...resolveStoredAgent(getAgentSelection()),
+        ...(persona.agent ? { agent: persona.agent } : {}),
+        ...(persona.tools ? { tools: persona.tools } : {}),
+        ...(system ? { system } : {}),
       });
       // Fetch current truth (includes the user message); streamed
       // assistant deltas arrive via SSE, `session.idle` reconciles.
@@ -143,6 +185,7 @@ export function ChatView(props: { sessionID: string }) {
       <Show when={isDemo()} fallback={
         <MessageList
           messages={messageStore.messagesFor(props.sessionID)}
+          sessionId={props.sessionID}
           loading={query.isPending}
           streaming={streaming()}
           onRetry={onRetry}

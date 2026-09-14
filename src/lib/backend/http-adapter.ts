@@ -3,6 +3,8 @@ import type { Event as ServerEvent } from "@opencode-ai/sdk/client";
 import { strings } from "../i18n/en";
 import { buildBasicAuthHeader } from "../utils/env";
 import { logger } from "../utils/logger";
+import { devMode } from "../utils/devmode";
+import { logRawEvent } from "./eventLog";
 import type {
   BackendAdapter,
   ConnectConfig,
@@ -12,9 +14,12 @@ import type {
   RudraEventHandler,
   SendPromptInput,
   ServerHealth,
+  StreamState,
+  StreamStateHandler,
   Unsubscribe,
 } from "./types";
 import { RudraError, toRudraEvent } from "./types";
+import { nextReconnectDelay } from "./reconnect";
 
 interface FieldResult<TData, TError> {
   data: TData | undefined;
@@ -81,9 +86,11 @@ export class HttpBackendAdapter implements BackendAdapter {
   private baseUrl = "";
   private authHeader: string | undefined;
   private handlers = new Set<RudraEventHandler>();
+  private streamListeners = new Set<StreamStateHandler>();
   private sseAbort: AbortController | undefined;
   private sseRunning = false;
   private reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+  private reconnectAttempt = 0;
 
   async connect(config: ConnectConfig): Promise<void> {
     const baseUrl = normalizeBaseUrl(config.baseUrl);
@@ -237,6 +244,28 @@ export class HttpBackendAdapter implements BackendAdapter {
     return unwrap(result, "List agents");
   }
 
+  async importGitHub(username: string): Promise<{ profile: unknown; repos: unknown }> {
+    const login = username.trim().replace(/^@/, "");
+    if (!/^[A-Za-z0-9-]{1,39}$/.test(login)) {
+      throw new RudraError("invalid_input", "Enter a valid GitHub username");
+    }
+    const headers = { Accept: "application/vnd.github+json" };
+    let profileRes: Response;
+    let reposRes: Response;
+    try {
+      [profileRes, reposRes] = await Promise.all([
+        globalThis.fetch(`https://api.github.com/users/${login}`, { headers }),
+        globalThis.fetch(`https://api.github.com/users/${login}/repos?per_page=30&sort=updated`, { headers }),
+      ]);
+    } catch (err) {
+      throw new RudraError("unreachable", `GitHub request failed: ${(err as Error).message}`);
+    }
+    if (profileRes.status === 404) throw new RudraError("not_found", `GitHub user @${login} not found`);
+    if (!profileRes.ok) throw new RudraError("server_error", `GitHub profile failed with HTTP ${profileRes.status}`);
+    if (!reposRes.ok) throw new RudraError("server_error", `GitHub repos failed with HTTP ${reposRes.status}`);
+    return { profile: await profileRes.json(), repos: await reposRes.json() };
+  }
+
   subscribeToEvents(handler: RudraEventHandler): Unsubscribe {
     if (!this.client || !this.baseUrl) {
       logger.warn("subscribeToEvents called while disconnected; returning no-op");
@@ -250,7 +279,25 @@ export class HttpBackendAdapter implements BackendAdapter {
     };
   }
 
+  subscribeToStreamState(handler: StreamStateHandler): Unsubscribe {
+    this.streamListeners.add(handler);
+    return () => {
+      this.streamListeners.delete(handler);
+    };
+  }
+
+  private emitStream(state: StreamState): void {
+    for (const h of [...this.streamListeners]) {
+      try {
+        h(state);
+      } catch (err) {
+        logger.error(err);
+      }
+    }
+  }
+
   private stopStream(): void {
+    const wasActive = this.sseRunning || this.reconnectTimer !== undefined;
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = undefined;
@@ -258,14 +305,21 @@ export class HttpBackendAdapter implements BackendAdapter {
     this.sseAbort?.abort();
     this.sseAbort = undefined;
     this.sseRunning = false;
+    this.reconnectAttempt = 0;
+    if (wasActive) this.emitStream("closed");
   }
 
-  private scheduleReconnect(): void {
+  private scheduleReconnect(cause?: string): void {
     if (!this.client || this.handlers.size === 0 || this.reconnectTimer) return;
+    const delay = nextReconnectDelay(this.reconnectAttempt++);
+    logger.warn(
+      `SSE stream error${cause ? `: ${cause}` : ""}, retrying in ${delay}ms (attempt ${this.reconnectAttempt})`,
+    );
+    this.emitStream("retrying");
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = undefined;
       void this.ensureStream();
-    }, 3000);
+    }, delay);
   }
 
   private async ensureStream(): Promise<void> {
@@ -289,6 +343,8 @@ export class HttpBackendAdapter implements BackendAdapter {
       if (!res.ok || !res.body) {
         throw new Error(`SSE request failed with HTTP ${res.status}`);
       }
+      this.reconnectAttempt = 0;
+      this.emitStream("open");
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
@@ -298,6 +354,7 @@ export class HttpBackendAdapter implements BackendAdapter {
         if (abort.signal.aborted) break;
         buffer += decoder.decode(value, { stream: true });
         buffer = splitSseBuffer(buffer, (data) => {
+          if (devMode()) logRawEvent("sse", data.replace(/\s+/g, " "));
           handleSseData(data, (raw) => {
             const event = toRudraEvent(raw);
             if (event) this.emit(event);
@@ -309,10 +366,9 @@ export class HttpBackendAdapter implements BackendAdapter {
         this.sseRunning = false;
         return;
       }
-      logger.warn(`SSE stream error, retrying: ${(err as Error).message}`);
       this.sseRunning = false;
       this.sseAbort = undefined;
-      this.scheduleReconnect();
+      this.scheduleReconnect((err as Error).message);
       return;
     }
     this.sseRunning = false;
@@ -322,6 +378,7 @@ export class HttpBackendAdapter implements BackendAdapter {
   }
 
   private emit(event: RudraEvent): void {
+    if (devMode()) logRawEvent("app", event.type);
     for (const h of [...this.handlers]) {
       try {
         h(event);

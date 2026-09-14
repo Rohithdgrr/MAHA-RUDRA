@@ -162,6 +162,10 @@ export function toRudraEvent(raw: ServerEvent): RudraEvent | undefined {
 export type RudraEventHandler = (event: RudraEvent) => void;
 export type Unsubscribe = () => void;
 
+/** Lifecycle of the multiplexed SSE stream. `retrying` carries backoff attempts. */
+export type StreamState = "open" | "retrying" | "closed";
+export type StreamStateHandler = (state: StreamState) => void;
+
 export class RudraError extends Error {
   readonly code: string;
   constructor(code: string, message: string) {
@@ -201,12 +205,23 @@ export interface BackendAdapter {
   /** Agents known to the server (`GET /agent`). */
   listAgents(): Promise<Agent[]>;
   /**
+   * Public GitHub profile + repos for memory import (Phase 6). Raw JSON —
+   * the caller validates via `githubToCandidates`. No auth, no secrets.
+   */
+  importGitHub(username: string): Promise<{ profile: unknown; repos: unknown }>;
+  /**
    * Multiplexed SSE subscription to `/global/event`. Many callers may
    * subscribe; the adapter holds a single HTTP stream and fans out.
    * The returned function removes that handler; the stream closes when
    * the last handler unsubscribes or `disconnect()` is called.
    */
   subscribeToEvents(handler: RudraEventHandler): Unsubscribe;
+  /**
+   * SSE stream lifecycle for reconnect UI. The adapter owns timers;
+   * subscribers only render. Closed fires when the last handler leaves
+   * or `disconnect()` runs; no event fires while never connected.
+   */
+  subscribeToStreamState(handler: StreamStateHandler): Unsubscribe;
 
   health(): Promise<ServerHealth>;
   /**

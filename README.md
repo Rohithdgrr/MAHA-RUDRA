@@ -1,14 +1,17 @@
 # 🕉️ RUDRA AI — The storm that writes code.
 
+![RUDRA AI](public/brand/RUDRA-AI-LOGO.png)
+
 A web-first, terminal-class AI coding workspace powered by a headless
 [OpenCode](https://opencode.ai) server. RUDRA AI connects to `opencode serve`
 over HTTP + SSE, streams agent responses token-by-token with live tool
 visibility, and is architected so a future Tauri v2 desktop shell can adopt
 it **without rewriting the frontend**.
 
-> **Status:** Phases 1–5 implemented and verified (53/53 tests, clean
-> typecheck, static `dist/` + MSI/NSIS desktop bundles). See
-> [Phase-wise plan](#-phase-wise-plan).
+> **Status:** Phases 1–5 (shell) plus the memory subsystem (store,
+> extraction, injection, bulk import, audit) implemented and verified
+> (148/148 tests, clean typecheck, static `dist/` + MSI/NSIS desktop
+> bundles). See [Phase-wise plan](#-phase-wise-plan).
 
 ---
 
@@ -178,9 +181,9 @@ toasts, palette). `session.idle` events invalidate queries to reconcile.
 | Styling | Tailwind CSS + CSS variables | `tailwindcss@3.4` |
 | OpenCode | `@opencode-ai/sdk` (public surface only) | `1.18` |
 | Realtime | SSE over `fetch` stream (auth-header capable) | native |
-| Markdown | `marked` + `dompurify` (`shiki` installed, wiring pending) | `18.0` / `3.4` |
+| Markdown | `marked` + `dompurify` + `shiki` (lazy chunk, regex fallback) | `18.0` / `3.4` |
 | Icons | `lucide-solid` | `1.45` |
-| Tests | `vitest` + `@solidjs/testing-library`, jsdom | `vitest@5` (53 tests) |
+| Tests | `vitest` + `@solidjs/testing-library`, jsdom | `vitest@5` (148 tests, 30 files) |
 | Desktop | Tauri v2 + shell/dialog/notification/updater/deep-link/single-instance | `2.11` |
 | Icons | `tauri icon` from `hero.png` | generated |
 
@@ -306,8 +309,9 @@ npx tauri build            # → MSI + NSIS in src-tauri/target/release/bundle/
 # Unsigned local build: updater disabled (createUpdaterArtifacts: false).
 # For signed updates: set TAURI_SIGNING_PRIVATE_KEY + enable updater in tauri.conf.json
 
-# 3. (optional) password-protect the server, then use the same
-#    username/password on the Connect page
+# 3. (strongly recommended for remote servers) password-protect the server,
+#    then use the same username/password on the Connect page. The Connect
+#    page warns on remote URLs without a password and on old server versions.
 export OPENCODE_SERVER_PASSWORD="…"
 opencode serve --port 4096 --cors http://localhost:5173
 ```
@@ -321,7 +325,7 @@ Production preview: `npm run build && npm run preview` (serves static `dist/`).
 | `npm run dev` | Vite dev server (http://localhost:5173) |
 | `npm run build` | `tsc -b` + static production build → `dist/` |
 | `npm run preview` | Preview the production build |
-| `npm run test` | `vitest run` (53 tests, 10 files) |
+| `npm run test` | `vitest run` (148 tests, 30 files) |
 | `npm run test:watch` | Watch mode |
 | `npm run typecheck` | Strict TS check, no emit |
 | `npm run tauri dev` | Tauri dev (Vite + sidecar) |
@@ -336,12 +340,16 @@ rudra-ai/
 ├── src/
 │   ├── App.tsx / index.tsx / router.tsx
 │   ├── lib/backend/   types, http-adapter, tauri-adapter (delegates), index
-│   ├── lib/opencode/  client, sessions, messages, models, agents, events
+│   ├── lib/opencode/  client, sessions, messages, models, agents, events,
+│   │                   server (version floor + URL guards)
+│   ├── lib/memory/    types, store (+localStorage/IndexedDB), redact,
+│   │                   parseRemember, extract, normalize, inject, policy,
+│   │                   audit, export, resumeImport, memory.store
 │   ├── lib/stores/    session.store, message.store, ui.store
 │   ├── lib/tauri/     desktop.ts (guarded bridge)
 │   ├── lib/utils/     env, markdown, format, export, logger
 │   ├── lib/i18n/en.ts
-│   ├── components/{layout,chat,sessions,ui}/
+│   ├── components/{layout,chat,sessions,ui,settings/memory}/
 │   ├── pages/         Connect, Workspace, Settings
 │   └── styles/globals.css
 ├── public/  index.html  vite.config.ts  tailwind.config.ts
@@ -373,16 +381,29 @@ Conventions: adapter owns all I/O; UI consumes `RudraEvent`; strings in
   (>30s background turns), updater wiring + deep links (`rudra://`) +
   single-instance forwarding + file/folder associations (`rudra-ai
   C:\proj`). *(shipped, updater unsigned — see Setup)*
-- Deferred: Projects + IndexedDB, MCP/plugin discovery page, custom-agent
-  `AgentForm`, shiki highlighting, heartbeat + exponential backoff, gated
-  integration test (`RUN_INTEGRATION=1`), `phase-N` git tags.
+- [x] **Phase 6 — Memory foundation**: typed store (localStorage +
+  IndexedDB with one-time migration), manual CRUD in Settings, secret
+  redaction, audit ring. *(shipped)*
+- [x] **Phase 7 — Memory extraction & injection**: explicit `remember …` /
+  `/memory` commands with toast + undo, background LLM extraction into a
+  review queue, confidence-routed auto-save, budgeted prompt injection
+  merged with personas, resume/GitHub bulk import with preview, JSON/Markdown
+  export + delete-all. *(shipped)*
+- [x] **Phase 8 — Hardening & polish**: Connect URL validation +
+  remote-without-auth and old-server warnings, exponential-backoff SSE
+  reconnect with statusbar indicator, Shiki highlighting (lazy chunk +
+  regex fallback), developer mode (verbose logging + raw SSE viewer),
+  sub-200-line component splits. *(shipped)*
+- Deferred: MCP/plugin discovery page, custom-agent `AgentForm`,
+  heartbeat monitor, gated integration test (`RUN_INTEGRATION=1`),
+  `phase-N` git tags.
 
 ---
 
 ## 🔭 Future scope
 
-Project-scoped workspaces UI + IndexedDB persistence (directory already
-wired); MCP server discovery and enable/disable with tool counts;
+Project-scoped workspaces UI (directory already wired); MCP server
+discovery and enable/disable with tool counts;
 user-defined agent personas (`AgentForm`); shiki code highlighting;
 message attachments; multi-worktree support; collaboration (shared links,
 comments); PWA packaging; signed auto-update feed
@@ -396,11 +417,14 @@ submenu; Windows file-association registry polish.
   and show a guided fix box.
 - **Ctrl+N can't be overridden in Chrome** (browser-reserved); the shortcut
   works in Tauri/Firefox. Palette entry always works.
-- **Reconnect is fixed 3s, not exponential**, and there's no heartbeat
-  monitor yet — a dead-but-open stream can look idle.
+- **Reconnect uses exponential backoff** (1s → 30s cap, ±25% jitter)
+  with a "Reconnecting…" statusbar indicator, but there's still no
+  heartbeat monitor — a dead-but-open stream can look idle.
 - **No optimistic user bubble**: the message appears after the POST
   round-trip, not instantly.
-- **Shiki installed but unwired**; code blocks render plain via marked.
+- **Shiki highlighting loads lazily** at startup (own chunk); code cards
+  use the regex tokenizer until grammars are ready and for unknown
+  languages.
 - **No integration test** against a live server; no git history/tags in this
   snapshot.
 
@@ -430,7 +454,7 @@ submenu; Windows file-association registry polish.
 - Queries cached with `staleTime` for providers/agents; no window-focus
   refetch storms (`retry: false`).
 - Markdown renders per-part; long tool outputs truncated (2k chars) with
-  capped scroll regions. Production bundle ≈ 218 kB JS (≈ 69 kB gzip).
+  capped scroll regions. Production bundle ≈ 357 kB JS (≈ 109 kB gzip).
 
 ## 🔒 Security
 
@@ -438,12 +462,20 @@ submenu; Windows file-association registry polish.
   HTTP Basic credentials for server access (stored in memory, never logged).
 - All rendered markdown sanitized via DOMPurify (scripts/handlers stripped).
 - Auth probe sends no credentials; password-whitespace warning on Connect.
+- Connect validates the server URL (http/https only), warns on remote
+  hosts without a password, and warns when the server version is below
+  the auth-hardening floor (`≥ 1.0.216`, see `lib/opencode/server.ts`).
+- Memory secrets (API keys, tokens, card numbers) are redacted
+  client-side before storage — and blocked explicit saves never reach
+  the server. Memory stays local-only (localStorage → IndexedDB).
+- Desktop: strict Tauri CSP (`connect-src` pinned to loopback) and
+  least-privilege capabilities (sidecar spawn scoped to fixed args).
 - `requiresAuth`/health errors typed as `RudraError` with safe messages.
 
 ## 🛠️ Maintenance
 
 - `CHANGELOG.md` per phase; run `test` + `typecheck` + `build` before any
-  milestone (currently all green: 53/53, zero TS errors, MSI/NSIS built unsigned).
+  milestone (currently all green: 148/148, zero TS errors, MSI/NSIS built unsigned).
 - Dependabot-style watch on `@opencode-ai/sdk` minors; re-verify
   `toRudraEvent` against new `Event` variants (unknowns are ignored by design).
 - Backend rule stays absolute: no fetch/SDK/EventSource outside adapters.

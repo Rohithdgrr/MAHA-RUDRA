@@ -10,6 +10,7 @@ import type {
   SendPromptInput,
   ServerHealth,
   Session,
+  StreamStateHandler,
   Unsubscribe,
 } from "./types";
 
@@ -69,8 +70,14 @@ export class TauriBackendAdapter implements BackendAdapter {
   listAgents(): Promise<Agent[]> {
     return this.inner.listAgents();
   }
+  importGitHub(username: string): Promise<{ profile: unknown; repos: unknown }> {
+    return this.inner.importGitHub(username);
+  }
   subscribeToEvents(handler: RudraEventHandler): Unsubscribe {
     return this.inner.subscribeToEvents(handler);
+  }
+  subscribeToStreamState(handler: StreamStateHandler): Unsubscribe {
+    return this.inner.subscribeToStreamState(handler);
   }
   health(): Promise<ServerHealth> {
     return this.inner.health();

@@ -25,8 +25,8 @@ export function sessionToMarkdown(
   return lines.join("\n");
 }
 
-export function downloadText(filename: string, text: string): void {
-  const blob = new Blob([text], { type: "text/markdown;charset=utf-8" });
+export function downloadText(filename: string, text: string, mime = "text/markdown;charset=utf-8"): void {
+  const blob = new Blob([text], { type: mime });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;

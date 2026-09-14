@@ -4,6 +4,7 @@ import { Show } from "solid-js";
 import { sessionStore } from "../../lib/stores/session.store";
 import { uiStore } from "../../lib/stores/ui.store";
 import { Logo } from "../ui/Logo";
+import { ReviewQueueBadge } from "../memory/ReviewQueueBadge";
 
 /** Top bar: brand + complete folder path (only up to opened folder) | search + theme + settings + avatar. */
 export function TopBar() {
@@ -48,15 +49,18 @@ export function TopBar() {
         >
           {dark() ? <Moon size={16} /> : <Sun size={16} />}
         </button>
-        <button
-          type="button"
-          class="icon-btn"
-          onClick={() => uiStore.setSettingsOpen(true)}
-          aria-label="Settings"
-          title="Settings"
-        >
-          <Settings size={16} />
-        </button>
+        <span style="position:relative;display:inline-flex">
+          <button
+            type="button"
+            class="icon-btn"
+            onClick={() => uiStore.setSettingsOpen(true)}
+            aria-label="Settings"
+            title="Settings"
+          >
+            <Settings size={16} />
+          </button>
+          <ReviewQueueBadge />
+        </span>
         <span class="avatar-chip" title="Rudra Agent">RA</span>
       </div>
     </header>

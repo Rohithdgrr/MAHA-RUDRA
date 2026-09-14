@@ -208,4 +208,27 @@ describe("SSE streaming (Phase 2)", () => {
     unB();
     adapter.disconnect();
   }, 10000);
+
+  it("emits open then retrying when the server closes the stream", async () => {
+    const fetchMock = vi.fn(async (input: unknown, _init?: RequestInit) => {
+      void _init;
+      const url = urlOf(input);
+      if (url.endsWith("/global/health")) return Response.json({ healthy: true, version: "x" });
+      if (url.endsWith("/global/event")) return sseResponse([]);
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
+
+    const adapter = new HttpBackendAdapter();
+    await adapter.connect({ baseUrl: "http://localhost:4096" });
+    const states: string[] = [];
+    const stopWatch = adapter.subscribeToStreamState((s) => states.push(s));
+    const unsub = adapter.subscribeToEvents(() => undefined);
+    await vi.waitFor(() => expect(states).toContain("open"));
+    await vi.waitFor(() => expect(states).toContain("retrying"));
+
+    unsub();
+    stopWatch();
+    adapter.disconnect();
+  }, 10000);
 });

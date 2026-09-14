@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { DEFAULT_PREFS, loadPrefs, uiStore } from "./ui.store";
+import { DEFAULT_PREFS, PREFS_VERSION, loadPrefs, migrateLegacyPrefs, uiStore } from "./ui.store";
 
 describe("loadPrefs", () => {
   it("returns defaults for empty input", () => {
@@ -9,49 +9,73 @@ describe("loadPrefs", () => {
   });
 
   it("returns defaults for corrupt JSON or non-objects", () => {
-    expect(loadPrefs("{nope")).toEqual(DEFAULT_PREFS);
+    expect(loadPrefs("{nope}")).toEqual(DEFAULT_PREFS);
     expect(loadPrefs("42")).toEqual(DEFAULT_PREFS);
     expect(loadPrefs('"str"')).toEqual(DEFAULT_PREFS);
+  });
+
+  it("defaults to hands-off autonomy", () => {
+    expect(DEFAULT_PREFS.approvalMode).toBe("autonomous");
+    expect(DEFAULT_PREFS.confirmBash).toBe(false);
+    expect(DEFAULT_PREFS.confirmWrite).toBe(false);
+    expect(DEFAULT_PREFS.confirmNetwork).toBe(false);
   });
 
   it("accepts a fully valid payload", () => {
     expect(
       loadPrefs(
         JSON.stringify({
-          approvalMode: "autonomous",
+          approvalMode: "read-only",
           compressionThreshold: 72,
-          daemonAutoConnect: false,
-          daemonHost: "0.0.0.0",
-          daemonPort: "8080",
-          telemetryAlertAt: "5.50",
-          tokenBudget: "128000",
-          fallbackModel: "openai/gpt-4o",
-          confirmBash: false,
+          confirmBash: true,
           confirmWrite: false,
           confirmNetwork: false,
           effort: "High",
+          memoryEnabled: false,
+          memoryBudgetTokens: 500,
+          includeSensitiveMemory: true,
+          memoryAutoSave: false,
+          prefsVersion: 1,
         }),
       ),
     ).toEqual({
-      approvalMode: "autonomous",
+      approvalMode: "read-only",
       compressionThreshold: 72,
-      daemonAutoConnect: false,
-      daemonHost: "0.0.0.0",
-      daemonPort: "8080",
-      telemetryAlertAt: "5.50",
-      tokenBudget: "128000",
-      fallbackModel: "openai/gpt-4o",
-      confirmBash: false,
+      confirmBash: true,
       confirmWrite: false,
       confirmNetwork: false,
       effort: "High",
+      memoryEnabled: false,
+      memoryBudgetTokens: 500,
+      includeSensitiveMemory: true,
+      memoryAutoSave: false,
+      prefsVersion: 1,
     });
   });
 
+  it("marks stored payloads without a version as legacy", () => {
+    expect(loadPrefs(JSON.stringify({})).prefsVersion).toBe(0);
+  });
+
+  it("ignores removed pre-redesign keys", () => {
+    const p = loadPrefs(
+      JSON.stringify({
+        daemonAutoConnect: false,
+        daemonHost: "0.0.0.0",
+        tokenBudget: "128000",
+        fallbackModel: "openai/gpt-4o",
+      }),
+    );
+    expect("daemonHost" in p).toBe(false);
+    expect("tokenBudget" in p).toBe(false);
+    expect("fallbackModel" in p).toBe(false);
+  });
+
   it("falls back per-field for unknown values", () => {
-    expect(
-      loadPrefs(JSON.stringify({ approvalMode: "yolo", effort: "Extreme", extra: 1 })),
-    ).toEqual(DEFAULT_PREFS);
+    expect(loadPrefs(JSON.stringify({ approvalMode: "yolo", effort: "Extreme", extra: 1 }))).toEqual({
+      ...DEFAULT_PREFS,
+      prefsVersion: 0,
+    });
   });
 
   it("clamps the compression threshold into 50..95", () => {
@@ -63,12 +87,35 @@ describe("loadPrefs", () => {
     );
   });
 
-  it("rejects blank alert values and non-boolean daemon flags", () => {
-    const prefs = loadPrefs(
-      JSON.stringify({ telemetryAlertAt: "   ", daemonAutoConnect: "yes" }),
-    );
-    expect(prefs.telemetryAlertAt).toBe(DEFAULT_PREFS.telemetryAlertAt);
-    expect(prefs.daemonAutoConnect).toBe(DEFAULT_PREFS.daemonAutoConnect);
+  it("defaults memory prefs when absent and clamps the budget", () => {
+    const p = loadPrefs(JSON.stringify({}));
+    expect(p.memoryEnabled).toBe(true);
+    expect(p.memoryBudgetTokens).toBe(800);
+    expect(p.includeSensitiveMemory).toBe(false);
+    expect(p.memoryAutoSave).toBe(true);
+    expect(loadPrefs(JSON.stringify({ memoryBudgetTokens: 50 })).memoryBudgetTokens).toBe(200);
+    expect(loadPrefs(JSON.stringify({ memoryBudgetTokens: 99999 })).memoryBudgetTokens).toBe(2048);
+  });
+});
+
+describe("migrateLegacyPrefs", () => {
+  it("migrates pre-redesign stores to hands-off autonomy once", () => {
+    const migrated = migrateLegacyPrefs({
+      ...DEFAULT_PREFS,
+      approvalMode: "always-ask",
+      confirmBash: true,
+      prefsVersion: 0,
+    });
+    expect(migrated.approvalMode).toBe("autonomous");
+    expect(migrated.confirmBash).toBe(false);
+    expect(migrated.confirmWrite).toBe(false);
+    expect(migrated.confirmNetwork).toBe(false);
+    expect(migrated.prefsVersion).toBe(PREFS_VERSION);
+  });
+
+  it("leaves migrated stores untouched, even on always-ask", () => {
+    const current = { ...DEFAULT_PREFS, approvalMode: "always-ask" as const };
+    expect(migrateLegacyPrefs(current)).toBe(current);
   });
 });
 

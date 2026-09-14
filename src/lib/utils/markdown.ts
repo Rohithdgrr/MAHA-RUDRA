@@ -3,13 +3,16 @@ import { marked } from "marked";
 import { uiStore } from "../stores/ui.store";
 import { strings } from "../i18n/en";
 import { escapeHtml, highlightToHtml, normalizeLang } from "./highlight";
+import { highlightWithShiki } from "./shiki";
 
 marked.setOptions({ breaks: true, gfm: true });
 
 /** Card chrome injected around highlighted code (body is escaped above). */
 function codeCardHtml(code: string, lang: string): string {
   const language = normalizeLang(lang);
-  const body = highlightToHtml(code, language);
+  // Shiki when its lazy bundle is ready; regex fallback otherwise.
+  const shiki = highlightWithShiki(code, language);
+  const body = shiki ?? highlightToHtml(code, language);
   const label = language || "code";
   return (
     `<div class="code-card"><div class="code-head">` +

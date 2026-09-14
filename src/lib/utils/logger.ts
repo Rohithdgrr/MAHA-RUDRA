@@ -7,8 +7,15 @@ const enabled: Record<LogLevel, boolean> = {
   error: true,
 };
 
+let verbose = false;
+
+/** Runtime verbose switch (Settings → Developer mode). Enables `debug` in prod builds. */
+export function setVerbose(on: boolean): void {
+  verbose = on;
+}
+
 function emit(level: LogLevel, ...args: unknown[]): void {
-  if (!enabled[level]) return;
+  if (!enabled[level] && !(verbose && level === "debug")) return;
   if (level === "error") console.error("[rudra]", ...args);
   else if (level === "warn") console.warn("[rudra]", ...args);
   else console.info("[rudra]", ...args);

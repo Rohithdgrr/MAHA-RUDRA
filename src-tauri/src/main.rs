@@ -141,7 +141,7 @@ fn take_startup_path(state: State<StartupState>) -> Option<String> {
 fn open_path_in_file_manager(path: String) -> Result<(), String> {
     use std::process::Command;
     let trimmed = path.trim();
-    if (trimmed.is_empty()) {
+    if trimmed.is_empty() {
         return Err("empty path".to_string());
     }
     let target = std::path::Path::new(trimmed);
