@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#17191D"/>
+      <stop offset="1" stop-color="#08090B"/>
+    </linearGradient>
+    <linearGradient id="orange" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FF6A2A"/>
+      <stop offset="1" stop-color="#FF4D1C"/>
+    </linearGradient>
+    <linearGradient id="ivory" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFFDF7"/>
+      <stop offset="1" stop-color="#E9E5DC"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#000000" flood-opacity=".55"/>
+    </filter>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="14" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- App icon background -->
+  <rect x="32" y="32" width="960" height="960" rx="190" fill="url(#bg)"/>
+  <rect x="33.5" y="33.5" width="957" height="957" rx="188.5"
+        fill="none" stroke="#2B2F35" stroke-width="3"/>
+
+  <!-- subtle diagonal depth -->
+  <path d="M120 780 L780 120 L900 120 L120 900 Z" fill="#FFFFFF" opacity=".018"/>
+
+  <!-- warm rim -->
+  <path d="M225 70 H220 C137 70 70 137 70 220 V804"
+        fill="none" stroke="#FF4D1C" stroke-width="5" stroke-linecap="round" opacity=".9"
+        filter="url(#glow)"/>
+  <path d="M220 70 H804 C887 70 954 137 954 220 V804"
+        fill="none" stroke="#707984" stroke-width="4" stroke-linecap="round" opacity=".45"/>
+
+  <!-- symbol -->
+  <g filter="url(#shadow)">
+    <!-- orange coding tile -->
+    <path d="M245 275 L620 275 L550 590 L175 590 Z" fill="url(#orange)"/>
+    <!-- ivory coding tile -->
+    <path d="M474 434 L849 434 L779 749 L404 749 Z" fill="url(#ivory)"/>
+
+    <!-- left bracket -->
+    <path d="M445 348 L395 348 L300 432 L395 517 L445 517 L350 432 Z"
+          fill="#0B0C0E"/>
+    <!-- right bracket -->
+    <path d="M604 507 L654 507 L749 592 L654 677 L604 677 L699 592 Z"
+          fill="#0B0C0E"/>
+  </g>
+
+  <!-- small central connection: code flow / intelligence -->
+  <path d="M476 590 H548" stroke="#FF4D1C" stroke-width="10" stroke-linecap="round" opacity=".9"/>
+  <circle cx="512" cy="590" r="7" fill="#FFFDF7"/>
+
+</svg>

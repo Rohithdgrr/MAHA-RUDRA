@@ -1,0 +1,54 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependencies
+node_modules
+dist
+dist-ssr
+*.local
+.vite
+
+# Build / cache
+.cache
+.turbo
+.next
+.nuxt
+.output
+
+# Tauri
+src-tauri/target/
+src-tauri/binaries/
+src-tauri/updater-key.key
+src-tauri/updater-key.key.pub
+src-tauri/gen/
+
+# Generated / test coverage
+coverage
+*.lcov
+.nyc_output
+
+# IDE
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS
+Thumbs.db
+desktop.ini
+
+# Misc
+*.bak
+*.orig
+.rej
